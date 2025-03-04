@@ -52,7 +52,7 @@ if command -v playerctl >/dev/null; then
 
 # nowplaying-cli
 elif command -v nowplaying-cli >/dev/null; then
-  NPCLI_PROPERTIES=(title duration elapsedTime playbackRate isAlwaysLive)
+  NPCLI_PROPERTIES=(title artist)
   mapfile -t NPCLI_OUTPUT < <(nowplaying-cli get "${NPCLI_PROPERTIES[@]}")
   declare -A NPCLI_VALUES
   for ((i = 0; i < ${#NPCLI_PROPERTIES[@]}; i++)); do
@@ -65,7 +65,14 @@ elif command -v nowplaying-cli >/dev/null; then
   else
     STATUS="paused"
   fi
-  TITLE="${NPCLI_VALUES[title]}"
+
+  # Combine artist and title with a separator
+  if [ -n "${NPCLI_VALUES[artist]}" ]; then
+    TITLE="${NPCLI_VALUES[title]} - ${NPCLI_VALUES[artist]}"
+  else
+    TITLE="${NPCLI_VALUES[title]}"
+  fi
+
   if [ "${NPCLI_VALUES[isAlwaysLive]}" = "1" ]; then
     DURATION=-1
     POSITION=0
@@ -88,18 +95,8 @@ elif command -v nowplaying-cli >/dev/null; then
   fi
 fi
 
-# Calculate the progress bar for sane durations
-if [ -n "$DURATION" ] && [ -n "$POSITION" ] && [ "$DURATION" -gt 0 ] && [ "$DURATION" -lt 3600 ]; then
-  TIME="[$(date -d@$POSITION -u +%M:%S) / $(date -d@$DURATION -u +%M:%S)]"
-else
-  TIME="[--:--]"
-fi
 if [ -n "$TITLE" ]; then
-  if [ "$STATUS" = "playing" ]; then
-    PLAY_STATE="░ $OUTPUT"
-  else
-    PLAY_STATE="░ 󰏤$OUTPUT"
-  fi
+  PLAY_STATE="░ $OUTPUT"
   OUTPUT="$PLAY_STATE $TITLE"
 
   # Only show the song title if we are over $MAX_TITLE_WIDTH characters
@@ -110,7 +107,7 @@ else
   OUTPUT=''
 fi
 
-MAX_TITLE_WIDTH=25
+MAX_TITLE_WIDTH=65
 if [ "${#OUTPUT}" -ge $MAX_TITLE_WIDTH ]; then
   OUTPUT="$PLAY_STATE ${TITLE:0:$MAX_TITLE_WIDTH-1}"
   # Remove trailing spaces
@@ -120,18 +117,6 @@ fi
 if [ -z "$OUTPUT" ]; then
   echo "$OUTPUT #[fg=green,bg=default]"
 else
-  OUT="$OUTPUT $TIME "
-  ONLY_OUT="$OUTPUT "
-  TIME_INDEX=${#ONLY_OUT}
-  OUTPUT_LENGTH=${#OUT}
-  PERCENT=$((POSITION * 100 / DURATION))
-  PROGRESS=$((OUTPUT_LENGTH * PERCENT / 100))
-  O="$OUTPUT"
-
-  if [ $PROGRESS -le $TIME_INDEX ]; then
-    echo "#[nobold,fg=$BG_COLOR,bg=$ACCENT_COLOR]${O:0:PROGRESS}#[fg=$ACCENT_COLOR,bg=$BG_BAR]${O:PROGRESS:TIME_INDEX} #[fg=$TIME_COLOR,bg=$BG_BAR]$TIME "
-  else
-    DIFF=$((PROGRESS - TIME_INDEX))
-    echo "#[nobold,fg=$BG_COLOR,bg=$ACCENT_COLOR]${O:0:TIME_INDEX} #[fg=$BG_BAR,bg=$ACCENT_COLOR]${OUT:TIME_INDEX:DIFF}#[fg=$TIME_COLOR,bg=$BG_BAR]${OUT:PROGRESS}"
-  fi
+  # Replace the progress bar logic with a simple output of song details and time
+  echo "#[nobold,fg=$ACCENT_COLOR,bg=$BG_BAR]$OUTPUT #[fg=$TIME_COLOR,bg=$BG_BAR]$TIME "
 fi
